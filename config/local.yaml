@@ -1,0 +1,6 @@
+env: "local" # Окружение - local, dev, prod
+storage_path: "./storage/storage.db" # Файл в котором будет храниться наша бд
+http_server: # Конфигурация нашего http server-а
+  address: "localhost:8082"
+  timeout: 4s
+  idle_timeout: 30s
