@@ -1,7 +1,7 @@
 package sl
 
 import (
-	"golang.org/x/exp/slog"
+	"log/slog"
 )
 
 // slog свое дополнение

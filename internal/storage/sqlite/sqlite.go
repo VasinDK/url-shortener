@@ -4,10 +4,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"mod_shortener/internal/lib/api/user"
+	"mod_shortener/internal/lib/crypto"
+	"mod_shortener/internal/lib/logger/sl"
 	"mod_shortener/internal/storage"
 
+	"log/slog"
+
 	"github.com/mattn/go-sqlite3"
-	"golang.org/x/exp/slog"
 )
 
 type Storage struct {
@@ -34,6 +38,32 @@ func New(storagePath string) (*Storage, error) {
 			alias TEXT NOT NULL UNIQUE,
 			url TEXT NOT NULL);
 		CREATE INDEX idx_alias ON url (alias);
+	`)
+
+	if err != nil {
+		return nil, fmt.Errorf("%s, %w", op, err)
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		return nil, fmt.Errorf("%s %w", op, err)
+	}
+
+	// stmt, err = db.
+
+	// DROP TABLE IF EXISTS user;
+	stmt, err = db.Prepare(`
+		CREATE TABLE IF NOT EXISTS user(
+			id INTEGER PRIMARY KEY,
+			login TEXT NOT NULL UNIQUE,
+			name TEXT,
+			surname TEXT ,
+			email TEXT UNIQUE,
+			phone TEXT,
+			pass TEXT NOT NULL,
+			refresh_token TEXT UNIQUE);
+
+		CREATE INDEX idx_login ON user(login);
 	`)
 
 	if err != nil {
@@ -121,4 +151,45 @@ func (s *Storage) DeleteURL(id int64) (int64, error) {
 	}
 
 	return 0, fmt.Errorf("%s %w", op, err)
+}
+
+func (s *Storage) AddUser(user *user.User, log *slog.Logger) (int64, error) {
+	const op = "Sqlite.Storage.AddUser"
+
+	stmt, err := s.db.Prepare(`
+		INSERT INTO user(login, name, surname, email, phone, pass, refresh_token) 
+		VALUES(?,?,?,?,?,?,?)
+	`)
+
+	if err != nil {
+		log.Error(op+".Prepare", sl.Err(err))
+		return 0, fmt.Errorf("%s, %w", op, err)
+	}
+
+	user.Pass, _ = crypto.HashPass(user.Pass)
+
+	res, err := stmt.Exec(
+		user.Login,
+		user.Name,
+		user.Surname,
+		user.Email,
+		user.Phone,
+		user.Pass,
+		user.Refresh_token,
+	)
+	if err != nil {
+		log.Error(op+".Exec", sl.Err(err))
+		return 0, fmt.Errorf("%s, %w", op, err)
+	}
+
+	id, err := res.LastInsertId()
+	if err != nil {
+		return 0, fmt.Errorf("%s, %w", op, err)
+	}
+
+	return id, nil
+}
+
+func (s *Storage) GetPass() {
+
 }
