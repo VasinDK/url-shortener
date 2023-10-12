@@ -3,8 +3,14 @@ package main
 import (
 	"log/slog"
 	"mod_shortener/internal/config"
+	"mod_shortener/internal/http-server/handlers/url/delete"
+	"mod_shortener/internal/http-server/handlers/url/redirect"
+	"mod_shortener/internal/http-server/handlers/url/save"
+	"mod_shortener/internal/http-server/handlers/users"
+	"mod_shortener/internal/lib/my_middleware"
 	"mod_shortener/internal/lib/logger/sl"
 	"mod_shortener/internal/storage/sqlite"
+	"net/http"
 	"os"
 
 	"github.com/go-chi/chi"
@@ -58,14 +64,47 @@ func main() {
 		log.Error("delElem", sl.Err(err))
 	} */
 
+	// _ = storage
+
 	// todo: init router: chi, "chi render"
 	router := chi.NewRouter()
+
+	router.Use(my_middleware.JWT)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
 	router.Use(middleware.URLFormat)
 
-	// todo: run server
+	router.Route("/url", func(r chi.Router) {
+		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
+			// сдалать BearerAuth, JWT AUTH
+			cfg.HTTPServer.User: cfg.HTTPServer.Password,
+			"aaa":               "aaa",
+		}))
+
+		r.Post("/", save.New(log, storage))
+		r.Delete("/{id}", delete.New(log, storage))
+	})
+
+	router.Get("/{alias}", redirect.New(log, storage))
+	router.Post("/users/reg", users.New(log, storage))
+	router.Post("/users/auth", users.Auth(log, storage))
+
+	log.Info("starting server", slog.String("address", cfg.Address))
+
+	srv := &http.Server{
+		Addr:         cfg.Address,
+		Handler:      router,
+		ReadTimeout:  cfg.HTTPServer.Timeout,
+		WriteTimeout: cfg.HTTPServer.Timeout,
+		IdleTimeout:  cfg.IdleTimeout,
+	}
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Error("failed to start server")
+	}
+
+	log.Error("server stopped")
 }
 
 func setupLogger(env string) *slog.Logger {
