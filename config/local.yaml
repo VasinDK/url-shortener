@@ -1,8 +1,11 @@
 env: "local" # Окружение - local, dev, prod
 storage_path: "./storage/storage.db" # Файл в котором будет храниться наша бд
-http_server: # Конфигурация нашего http server-а
+http_server: # Конфигурация http server-а
   address: "localhost:8082"
   timeout: 4s
   idle_timeout: 30s
   user: "myuser"
   password: "mypass"
+key_token: "hello_pony"
+access_token_ttl: 10    # seconds
+refresh_token_ttl: 100  # minutes

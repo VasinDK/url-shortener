@@ -28,6 +28,7 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 		)
 
 		alias := chi.URLParam(r, "alias")
+
 		if alias == "" {
 
 			log.Info("alias is empty")
@@ -55,6 +56,7 @@ func New(log *slog.Logger, urlGetter URLGetter) http.HandlerFunc {
 		}
 
 		log.Info("got url", slog.String("resUrl", resUrl))
+
 		render.JSON(w, r, resp.Ok())
 
 		http.Redirect(w, r, resUrl, http.StatusFound)

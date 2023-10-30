@@ -9,9 +9,12 @@ import (
 )
 
 type Config struct {
-	Env        string `yaml:"env" env-default:"development"`
-	Storage    string `yaml:"storage_path" enb-required:"true"`
-	HTTPServer `yaml:"http_server"`
+	Env             string `yaml:"env" env-default:"development"`
+	Storage         string `yaml:"storage_path" enb-required:"true"`
+	HTTPServer      `yaml:"http_server"`
+	KeyToken        string `yaml:"key_token"`
+	AccessTokenTTL  int64  `yaml:"access_token_ttl"`
+	RefreshTokenTTL int64  `yaml:"refresh_token_ttl"`
 }
 
 type HTTPServer struct {
@@ -24,6 +27,7 @@ type HTTPServer struct {
 
 func MustLoad() *Config {
 	configPath := os.Getenv("CONFIG_PATH")
+
 	if configPath == "" {
 		log.Fatal("CONFIG_PATH environment variable is not set")
 	}
@@ -35,9 +39,12 @@ func MustLoad() *Config {
 	var cfg Config
 
 	err := cleanenv.ReadConfig(configPath, &cfg)
+
 	if err != nil {
-		log.Fatalf("error reading config file: %s", err)
+		log.Fatalf("error reading config file in MustLoad: %s", err)
 	}
 
 	return &cfg
 }
+
+// TODO: Сделать кэш

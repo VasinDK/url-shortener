@@ -7,8 +7,8 @@ import (
 	"mod_shortener/internal/http-server/handlers/url/redirect"
 	"mod_shortener/internal/http-server/handlers/url/save"
 	"mod_shortener/internal/http-server/handlers/users"
-	"mod_shortener/internal/lib/my_middleware"
 	"mod_shortener/internal/lib/logger/sl"
+	"mod_shortener/internal/lib/my_middleware"
 	"mod_shortener/internal/storage/sqlite"
 	"net/http"
 	"os"
@@ -24,52 +24,26 @@ const (
 )
 
 func main() {
-	// todo: init config: cleanenv
 	cfg := config.MustLoad()
 
-	// todo: init logger: slog
 	log := setupLogger(cfg.Env)
 
-	// log = log.With(slog.String("env006", cfg.Env))
-	// log.Info("starting url-shortener", slog.String("env007", cfg.Env))
-	// log.Debug("this is Debug")
-
-	// todo: init storage: sqlite
 	storage, err := sqlite.New(cfg.Storage)
+	
 	if err != nil {
 		log.Error("failed init storage", sl.Err(err))
 		os.Exit(1)
 	}
 
-	res, err := storage.GetURL("ya")
-	if err != nil {
-		log.Error("res", sl.Err(err))
-	}
+	// res, err := storage.GetURL("ya")
+	// if err != nil {
+	// 	log.Error("res", sl.Err(err))
+	// }
 
-	log.Info(res)
+	// log.Info(res)
 
-	/* id, err := storage.SaveURL("www.google.ru", "gl")
-	if err != nil {
-		log.Error("err", sl.Err(err))
-		os.Exit(1)
-	}
-
-	log.Info("save url", slog.Int64("id", id))
-
-	resDel, err := storage.DeleteURL(id)
-
-	log.Info("delete by id", slog.Int64("Удалено строк:", resDel))
-
-	if err != nil {
-		log.Error("delElem", sl.Err(err))
-	} */
-
-	// _ = storage
-
-	// todo: init router: chi, "chi render"
 	router := chi.NewRouter()
 
-	router.Use(my_middleware.JWT)
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 	router.Use(middleware.Recoverer)
@@ -77,7 +51,6 @@ func main() {
 
 	router.Route("/url", func(r chi.Router) {
 		r.Use(middleware.BasicAuth("url-shortener", map[string]string{
-			// сдалать BearerAuth, JWT AUTH
 			cfg.HTTPServer.User: cfg.HTTPServer.Password,
 			"aaa":               "aaa",
 		}))
@@ -86,9 +59,14 @@ func main() {
 		r.Delete("/{id}", delete.New(log, storage))
 	})
 
-	router.Get("/{alias}", redirect.New(log, storage))
 	router.Post("/users/reg", users.New(log, storage))
-	router.Post("/users/auth", users.Auth(log, storage))
+	router.Post("/users/auth", users.Auth(log, storage, cfg))
+	router.Post("/users/refresh", users.Refresh(log, storage, cfg))
+
+	router.Group(func(r chi.Router) {
+		r.Use(my_middleware.JWT)
+		r.Get("/{alias}", redirect.New(log, storage))
+	})
 
 	log.Info("starting server", slog.String("address", cfg.Address))
 

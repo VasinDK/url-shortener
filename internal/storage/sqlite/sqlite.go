@@ -8,6 +8,7 @@ import (
 	"mod_shortener/internal/lib/crypto"
 	"mod_shortener/internal/lib/logger/sl"
 	"mod_shortener/internal/storage"
+	"time"
 
 	"log/slog"
 
@@ -61,7 +62,9 @@ func New(storagePath string) (*Storage, error) {
 			email TEXT UNIQUE,
 			phone TEXT,
 			pass TEXT NOT NULL,
-			refresh_token TEXT UNIQUE);
+			refresh_token TEXT UNIQUE,
+			expires_at DATETIME
+		);
 
 		CREATE INDEX idx_login ON user(login);
 	`)
@@ -167,6 +170,7 @@ func (s *Storage) AddUser(user *user.User, log *slog.Logger) (int64, error) {
 	}
 
 	user.Pass, _ = crypto.HashPass(user.Pass)
+	user.Refresh_token, _ = crypto.HashPass(user.Refresh_token)
 
 	res, err := stmt.Exec(
 		user.Login,
@@ -190,6 +194,91 @@ func (s *Storage) AddUser(user *user.User, log *slog.Logger) (int64, error) {
 	return id, nil
 }
 
-func (s *Storage) GetPass() {
+func (s *Storage) GetPass(login string, log *slog.Logger) (string, string, string, error) {
+	const op = "storage.sqlite.GetPass"
 
+	stmt, err := s.db.Prepare(`
+		SELECT id, pass, refresh_token 
+		FROM user 
+		WHERE login = ?
+	`)
+
+	if err != nil {
+		log.Error(op+" Prepare", sl.Err(err))
+	}
+
+	var pass string
+	var token string
+	var id string
+
+	err = stmt.QueryRow(login).Scan(&id, &pass, &token)
+
+	if err != nil {
+		log.Error(op+" Exec", sl.Err(err))
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", "", "", sql.ErrNoRows
+	}
+
+	return pass, token, id, nil
+}
+
+func (s *Storage) GetUser(login string, log *slog.Logger) (*user.User, error) {
+	const op = "storage.sqlite.GetUser"
+
+	stmt, err := s.db.Prepare(`
+		SELECT id, login, name, surname, email, phone
+		FROM user 
+		WHERE login = ?
+	`)
+
+	if err != nil {
+		log.Error(op+" Prepare", sl.Err(err))
+	}
+
+	userCurrent := &user.User{}
+
+	err = stmt.QueryRow(login).Scan(
+		&userCurrent.Id,
+		&userCurrent.Login,
+		&userCurrent.Name,
+		&userCurrent.Surname,
+		&userCurrent.Email,
+		&userCurrent.Phone,
+	)
+
+	if err != nil {
+		log.Error(op+" Exec", sl.Err(err))
+	}
+
+	if errors.Is(err, sql.ErrNoRows) {
+		return &user.User{}, sql.ErrNoRows
+	}
+
+	return userCurrent, nil
+}
+
+func (s *Storage) UpdateRefreshToken(RefToken string, ExpAT time.Time, log *slog.Logger, idUser string) (string, error) {
+	const op = "storage.sqlite.UpdateRefreshToken"
+
+	stmt, err := s.db.Prepare(`
+		UPDATE user 
+		SET refresh_token = ?, expires_at = ?
+		WHERE id = ?
+	`)
+
+	if err != nil {
+		log.Error(op, sl.Err(err))
+		return "", err
+	}
+
+	res, err := stmt.Exec(RefToken, ExpAT, idUser)
+
+	if err != nil {
+		log.Error(op+".Exec", sl.Err(err))
+		return "", err
+	}
+
+	return fmt.Sprint(res.LastInsertId()), nil
 }
