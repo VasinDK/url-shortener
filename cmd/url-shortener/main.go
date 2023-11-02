@@ -35,13 +35,6 @@ func main() {
 		os.Exit(1)
 	}
 
-	// res, err := storage.GetURL("ya")
-	// if err != nil {
-	// 	log.Error("res", sl.Err(err))
-	// }
-
-	// log.Info(res)
-
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
